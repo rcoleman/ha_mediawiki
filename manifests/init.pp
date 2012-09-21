@@ -2,9 +2,9 @@ define ha_mediawiki($ensure) {
 
   # need to delete everything the revers order its created in
   if ($ensure == 'absent') {
-    Gce_instance["${name}1"] -> Gce_network["${name}"]
-    Gce_instance["${name}2"] -> Gce_network["${name}"]
-    Gce_instance["${name}1"] -> Gce_disk["${name}disk"]
+    Gce_instance["${name}db"] -> Gce_network["${name}"]
+    Gce_instance["${name}wiki"] -> Gce_network["${name}"]
+    Gce_instance["${name}db"] -> Gce_disk["${name}disk"]
     Gce_firewall["${name}ssh"] -> Gce_network["${name}"]
     Gce_firewall["${name}http"] -> Gce_network["${name}"]
     Gce_firewall["${name}mysql"] -> Gce_network["${name}"]
@@ -113,15 +113,19 @@ define ha_mediawiki($ensure) {
   gce_instance { "${name}lb":
     ensure      => $ensure,
     description => 'LB instance',
-    disk        => "${name}disk",
     modules     => ['glarizza-haproxy'],
-    classes     => {
-      'haproxy' => { 'enable' => true, }
-      'ha_mediawiki::haproxy' => { 'lb_external_ip' => '$gce_external_ip', 'web_external_ip' => "Gce_instance[${name}web][internal_ip_address]" }
-    },
     module_repos => {
-      'git://github.com/rcoleman/ha_mediawiki' => 'mediawiki',
+      'http://github.com/rcoleman/ha_mediawiki.git' => 'ha_mediawiki',
     },
+    classes     => {
+      'haproxy' => { 'enable' => true, },
+      'ha_mediawiki::haproxy' => { 'lb_external_ip' => '$gce_external_ip', 'web_external_ip' => "Gce_instance[${name}wiki][external_ip_address]" }
+    },
+    require => Gce_instance["${name}wiki"],
   }
 
+}
+
+ha_mediawiki { 'forge':
+  ensure => $::ensure,
 }
